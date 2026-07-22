@@ -1,0 +1,143 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 210 2% 98%;
+    --foreground: 204 1% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 204 1% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 204 1% 11%;
+    --primary: 207 100% 18.6%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 150 100% 21%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 220 14% 96%;
+    --muted-foreground: 217 4% 28%;
+    --accent: 220 14% 94%;
+    --accent-foreground: 204 1% 11%;
+    --destructive: 0 75% 42%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 214 3% 91%;
+    --input: 214 3% 91%;
+    --ring: 207 100% 25%;
+    --radius: 0.5rem;
+    --sidebar-background: 208 100% 19%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 207 100% 18.6%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 208 79% 28%;
+    --sidebar-accent-foreground: 214 27% 77%;
+    --sidebar-border: 0 0% 100% / 0.1;
+    --sidebar-ring: 207 100% 25%;
+  }
+
+  .dark {
+    --background: 208 60% 7%;
+    --foreground: 210 30% 96%;
+    --card: 208 50% 11%;
+    --card-foreground: 210 30% 96%;
+    --popover: 208 50% 11%;
+    --popover-foreground: 210 30% 96%;
+    --primary: 150 70% 45%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 150 70% 40%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 208 40% 16%;
+    --muted-foreground: 215 20% 70%;
+    --accent: 208 40% 18%;
+    --accent-foreground: 210 30% 96%;
+    --destructive: 0 70% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 215 30% 20%;
+    --input: 215 30% 20%;
+    --ring: 150 70% 45%;
+    --sidebar-background: 208 70% 6%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 150 70% 45%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 208 50% 14%;
+    --sidebar-accent-foreground: 210 30% 96%;
+    --sidebar-border: 0 0% 100% / 0.08;
+    --sidebar-ring: 150 70% 45%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'IBM Plex Sans Arabic', 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  .font-numeric {
+    font-family: 'Inter', system-ui, sans-serif;
+    font-feature-settings: 'tnum' 1;
+  }
+}
+
+/* ─── Scrollbar ─── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.3);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.5);
+}
+
+/* ─── RTL Font Fix ─── */
+[dir="rtl"] .font-mono {
+  direction: ltr;
+  text-align: right;
+}
+
+/* ─── Print ─── */
+@media print {
+  body * { visibility: hidden; }
+  .print-only, .print-only * { visibility: visible; }
+  .print-only { position: absolute; left: 0; top: 0; width: 100%; }
+}
+
+/* ─── Animations ─── */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+.animate-slide-in {
+  animation: slideIn 0.3s ease-out;
+}
+
+/* ─── Utilities ─── */
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.border-3 {
+  border-width: 3px;
+}
+
+/* ─── Dark mode transition ─── */
+html {
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
