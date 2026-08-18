@@ -7,9 +7,9 @@ import type { AuthResult } from '@/services/auth';
 export function Login() {
   const { t, i18n } = useTranslation();
   const isRTL = i18n.language === 'ar';
-  const { login, register, hasAccounts } = useAuth();
+  const { login, register } = useAuth();
 
-  const [mode, setMode] = useState<'login' | 'register'>(hasAccounts ? 'login' : 'register');
+  const [mode, setMode] = useState<'login' | 'register'>('login');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -27,7 +27,7 @@ export function Login() {
       invalid_input: { en: 'Please fill in all fields correctly.', ar: 'يرجى تعبئة جميع الحقول بشكل صحيح.' },
     };
     const entry = code ? map[code] : undefined;
-    if (!entry) return isRTL ? 'حدث خطأ، حاول مرة أخرى.' : 'Something went wrong, try again.';
+    if (!entry) return code || (isRTL ? 'حدث خطأ، حاول مرة أخرى.' : 'Something went wrong, try again.');
     return isRTL ? entry.ar : entry.en;
   };
 
@@ -76,11 +76,11 @@ export function Login() {
         </div>
 
         <div className="bg-card rounded-2xl border border-border shadow-xl p-6">
-          {!hasAccounts && mode === 'register' && (
+          {mode === 'register' && (
             <div className="mb-4 p-3 rounded-lg bg-primary/10 text-primary text-xs text-center">
               {isRTL
-                ? 'أول حساب يتم إنشاؤه سيكون حساب المالك بكامل الصلاحيات.'
-                : 'The first account created will be the owner with full permissions.'}
+                ? 'إنشاء حساب جديد سيقوم بإنشاء مساحة عمل (Team) خاصة بك كمالك.'
+                : 'Creating a new account will create a new workspace (Team) for you as an owner.'}
             </div>
           )}
 

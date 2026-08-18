@@ -385,6 +385,7 @@ export interface User {
   role: UserRole;
   avatar?: string;
   isActive: boolean;
+  teamId?: string;
 }
 
 // حساب المصادقة المحلي (يُخزَّن في IndexedDB مع كلمة سر مُشفَّرة)

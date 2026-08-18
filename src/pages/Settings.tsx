@@ -645,7 +645,7 @@ export function Settings() {
           <div className={`flex items-center justify-between gap-3 ${isRTL ? 'flex-row-reverse' : ''}`}>
             <p className="text-sm text-muted-foreground">{t('settings.usersDesc')}</p>
             <button onClick={openAddUser} className="flex items-center gap-1.5 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 flex-shrink-0">
-              <Plus size={16} /> {t('settings.addUser')}
+              <Plus size={16} /> {isRTL ? 'إضافة حساب موظف' : 'Add Employee Account'}
             </button>
           </div>
           <div className="bg-card rounded-xl border border-border overflow-hidden">
