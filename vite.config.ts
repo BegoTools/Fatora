@@ -9,6 +9,11 @@ export default defineConfig({
   plugins: [inspectAttr(), react()],
   server: {
     port: 3000,
+    // Tauri writes locked .dll/.exe files here while Vite is watching. Watching
+    // that build output makes `tauri dev` crash on Windows with EBUSY.
+    watch: {
+      ignored: ['**/src-tauri/target/**'],
+    },
   },
   resolve: {
     alias: {

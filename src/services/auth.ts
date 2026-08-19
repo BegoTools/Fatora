@@ -98,9 +98,19 @@ export async function login(email: string, password: string): Promise<AuthResult
 }
 
 export async function getCurrentUser(): Promise<User | null> {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) return null;
-  return getUserWithTeam(session.user);
+  try {
+    const sessionPromise = supabase.auth.getSession();
+    const timeoutPromise = new Promise<{ data: { session: null }, error: null }>((resolve) => {
+      setTimeout(() => resolve({ data: { session: null }, error: null }), 3000);
+    });
+    
+    const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]);
+    if (!session) return null;
+    return getUserWithTeam(session.user);
+  } catch (err) {
+    console.error('getCurrentUser error or timeout:', err);
+    return null;
+  }
 }
 
 export async function logout(): Promise<void> {
@@ -144,36 +154,41 @@ export async function adminCreateAccount(
   const currentUser = await getCurrentUser();
   if (!currentUser || !currentUser.teamId) return { ok: false, error: 'not_found' };
 
-  // Use secondary client so we don't log out the current user
+  // Create a short-lived, email-bound invitation first.  The database trigger
+  // consumes it when the employee account is created, so the employee joins
+  // the owner's team instead of receiving a second, private team.
+  const inviteToken = crypto.randomUUID();
+  const { error: invitationError } = await supabase
+    .from('team_invitations')
+    .insert([{
+      team_id: currentUser.teamId,
+      email: cleanEmail,
+      name: cleanName,
+      role,
+      token: inviteToken,
+    }]);
+
+  if (invitationError) {
+    console.error('Team invitation error:', invitationError);
+    return { ok: false, error: invitationError.message };
+  }
+
+  // Use a secondary client so provisioning does not replace the owner's
+  // session. The trigger uses the invitation, not client-supplied team data.
   const { data, error } = await authSupabase.auth.signUp({
     email: cleanEmail,
     password,
     options: {
-      data: { name: cleanName },
+      data: { name: cleanName, invite_token: inviteToken },
     }
   });
 
   if (error) {
+    await supabase.from('team_invitations').delete().eq('token', inviteToken);
     if (error.message.includes('already registered')) return { ok: false, error: 'email_exists' };
     return { ok: false, error: error.message };
   }
   if (!data.user) return { ok: false, error: 'unknown_error' };
-
-  // Link new user to current team
-  const { error: memberError } = await supabase
-    .from('team_members')
-    .insert([{ 
-      team_id: currentUser.teamId, 
-      user_id: data.user.id, 
-      role,
-      email: cleanEmail,
-      name: cleanName
-    }]);
-
-  if (memberError) {
-    console.error('Member Insert Error:', memberError);
-    return { ok: false, error: memberError.message };
-  }
 
   return { 
     ok: true, 

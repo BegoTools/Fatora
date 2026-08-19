@@ -731,7 +731,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let mounted = true;
     (async () => {
-      const stored = await loadStateAsync();
+      // Keep a broken/slow cloud request from permanently blocking the UI.
+      let stored = getDefaultState();
+      try {
+        stored = await Promise.race([
+          loadStateAsync(),
+          new Promise<AppState>((resolve) => window.setTimeout(() => resolve(getDefaultState()), 8000)),
+        ]);
+      } catch (error) {
+        console.error('App data bootstrap error:', error);
+      }
       if (mounted) {
         dispatch({ type: 'SET_STATE', payload: stored });
         setBooted(true);
@@ -742,6 +751,52 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return () => { mounted = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // المزامنة اللحظية للبيانات بين أعضاء الفريق (Real-time synchronization for team_data)
+  useEffect(() => {
+    if (!booted) return;
+    
+    let channel: any = null;
+    let cleanup = false;
+
+    import('@/services/auth').then(({ getCurrentUser }) => {
+      getCurrentUser().then(user => {
+        if (cleanup || !user || !user.teamId) return;
+
+        import('@/services/supabase').then(({ supabase }) => {
+          if (cleanup) return;
+          channel = supabase
+            .channel('team_data_changes')
+            .on(
+              'postgres_changes',
+              {
+                event: 'UPDATE',
+                schema: 'public',
+                table: 'team_data',
+                filter: `team_id=eq.${user.teamId}`
+              },
+              (payload) => {
+                const newState = payload.new.state_json as AppState;
+                if (newState && Object.keys(newState).length > 0) {
+                  // تحديث الحالة عند أي تغيير من مستخدم آخر في الفريق
+                  rawDispatch({ type: 'SET_STATE', payload: newState });
+                }
+              }
+            )
+            .subscribe();
+        });
+      });
+    });
+
+    return () => {
+      cleanup = true;
+      if (channel) {
+        import('@/services/supabase').then(({ supabase }) => {
+          supabase.removeChannel(channel);
+        });
+      }
+    };
+  }, [booted]);
 
   const setModule = useCallback((module: ModuleId) => {
     dispatch({ type: 'SET_MODULE', payload: module });

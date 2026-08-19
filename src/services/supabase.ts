@@ -13,6 +13,10 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 // Secondary client for admin operations like creating employee accounts without logging out the owner
 export const authSupabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
+    // This client is deliberately isolated from the signed-in owner's session.
+    // Without a separate storage key Supabase creates two clients that compete
+    // for the same session and startup can become non-deterministic.
+    storageKey: 'easy-store-employee-provisioning',
     persistSession: false,
     autoRefreshToken: false,
     detectSessionInUrl: false,

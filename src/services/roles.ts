@@ -174,12 +174,38 @@ export function isSystemRoleId(id: string): boolean {
 // ------------------------------------------------------------
 // التحميل والحفظ (مع زرع الرتب المدمجة وضمان اكتمال الهيكل)
 // ------------------------------------------------------------
+import { supabase } from '@/services/supabase';
+import { getCurrentUser } from '@/services/auth';
+
 export async function getRoles(): Promise<RoleDefinition[]> {
-  const stored = (await idbGet<RoleDefinition[]>(ROLES_KEY)) ?? [];
   const defaults = defaultRoles();
   const byId = new Map<string, RoleDefinition>();
 
   for (const def of defaults) byId.set(def.id, def);
+
+  let stored: RoleDefinition[] = [];
+  try {
+    const user = await getCurrentUser();
+    if (user && user.teamId) {
+      const { data, error } = await supabase
+        .from('team_data')
+        .select('state_json')
+        .eq('team_id', user.teamId)
+        .single();
+      
+      if (!error && data?.state_json?.customRoles) {
+        stored = data.state_json.customRoles;
+        // Keep IDB as a local backup
+        await idbSet(ROLES_KEY, stored);
+      } else {
+        stored = (await idbGet<RoleDefinition[]>(ROLES_KEY)) ?? [];
+      }
+    } else {
+      stored = (await idbGet<RoleDefinition[]>(ROLES_KEY)) ?? [];
+    }
+  } catch {
+    stored = (await idbGet<RoleDefinition[]>(ROLES_KEY)) ?? [];
+  }
 
   for (const role of stored) {
     if (role.id === 'owner') continue; // المالك دائماً كامل الصلاحيات
@@ -203,8 +229,30 @@ export async function getRoles(): Promise<RoleDefinition[]> {
 }
 
 async function saveRoles(roles: RoleDefinition[]): Promise<void> {
-  // لا نُخزّن رتبة المالك (تُشتق دائماً كاملة)
-  await idbSet(ROLES_KEY, roles.filter(r => r.id !== 'owner'));
+  const customRoles = roles.filter(r => r.id !== 'owner' && !isSystemRoleId(r.id));
+  await idbSet(ROLES_KEY, customRoles);
+  
+  try {
+    const user = await getCurrentUser();
+    if (user && user.teamId) {
+      // Fetch current state, append customRoles, save back
+      const { data } = await supabase
+        .from('team_data')
+        .select('state_json')
+        .eq('team_id', user.teamId)
+        .single();
+      
+      if (data) {
+        const state_json = { ...data.state_json, customRoles };
+        await supabase
+          .from('team_data')
+          .update({ state_json, updated_at: new Date().toISOString() })
+          .eq('team_id', user.teamId);
+      }
+    }
+  } catch (err) {
+    console.error('Failed to sync roles to supabase:', err);
+  }
 }
 
 export async function getRole(id: string): Promise<RoleDefinition | undefined> {

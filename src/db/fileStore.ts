@@ -7,6 +7,18 @@ let fileCache: AppState | null = null;
 let writeQueue: Promise<void> = Promise.resolve();
 let isWritePending = false;
 
+async function withTimeout<T>(operation: PromiseLike<T>, timeoutMs = 6000): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      Promise.resolve(operation),
+      new Promise<T>((_, reject) => { timeoutId = setTimeout(() => reject(new Error('Timed out loading team data')), timeoutMs); }),
+    ]);
+  } finally {
+    if (timeoutId !== undefined) clearTimeout(timeoutId);
+  }
+}
+
 export function getFileCache(): AppState | null {
   return fileCache;
 }
@@ -29,16 +41,25 @@ export async function loadFromFile(): Promise<AppState | null> {
   }
 
   try {
-    const { data, error } = await supabase
+    const result = await withTimeout(supabase
       .from('team_data')
       .select('state_json')
       .eq('team_id', user.teamId)
-      .single();
+      .single());
+    const { data, error } = result;
 
-    if (error || !data || Object.keys(data.state_json || {}).length === 0) {
-      // If no valid data in Supabase, try local
+    if (error || !data) {
+      // If network error or no data returned, fallback to local
       const local = await idbGet<AppState>('state');
       return local || null;
+    }
+
+    if (Object.keys(data.state_json || {}).length === 0) {
+      // It's a fresh account from Supabase! Do NOT fallback to local IDB, 
+      // otherwise old local data will bleed into the new account.
+      // Return null so the app initializes a fresh default state.
+      await idbClear(); // Clear the old local data just in case
+      return null;
     }
 
     const state = data.state_json as AppState;

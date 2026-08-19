@@ -42,11 +42,70 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    let mounted = true;
     (async () => {
-      await Promise.all([refresh(), reloadRoles()]);
-      setLoading(false);
+      try {
+        // A network or browser-storage failure must never leave the desktop
+        // application on its splash spinner forever.
+        await Promise.race([
+          Promise.all([refresh(), reloadRoles()]),
+          new Promise<void>((resolve) => window.setTimeout(resolve, 6000)),
+        ]);
+      } catch (err) {
+        console.error('Auth init error:', err);
+      } finally {
+        if (mounted) setLoading(false);
+      }
     })();
+    return () => { mounted = false; };
   }, [refresh, reloadRoles]);
+
+  // Real-time synchronization for team_members (e.g., role changes)
+  useEffect(() => {
+    if (!user || !user.teamId) return;
+    
+    // Dynamically import supabase to avoid circular dependencies if any
+    import('@/services/supabase').then(({ supabase }) => {
+      const memberChannel = supabase
+        .channel('team_members_changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'team_members',
+            filter: `team_id=eq.${user.teamId}`
+          },
+          () => {
+            // Whenever any team member changes (e.g. role updated by owner), refresh our user state
+            refresh();
+          }
+        )
+        .subscribe();
+
+      const dataChannel = supabase
+        .channel('team_data_roles_changes')
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'team_data',
+            filter: `team_id=eq.${user.teamId}`
+          },
+          () => {
+            // Reload roles in case customRoles were modified in team_data
+            reloadRoles();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(memberChannel);
+        supabase.removeChannel(dataChannel);
+      };
+    });
+  }, [user?.teamId, refresh, reloadRoles]);
 
   const login = useCallback(async (email: string, password: string) => {
     const result = await authService.login(email, password);
