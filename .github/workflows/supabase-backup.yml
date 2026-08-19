@@ -62,7 +62,7 @@ jobs:
           
           echo "Proceeding with backup on $DB_HOST..."
           # Connect to the pooler (6543) using session pool mode which is required for pg_dump
-          CONN_URI="postgresql://${DB_USER}:${PGPASSWORD}@${DB_HOST}:6543/postgres?options=-c%20statement_timeout=0&pool_mode=session"
+          CONN_URI="postgresql://${DB_USER}:${PGPASSWORD}@${DB_HOST}:6543/postgres?pool_mode=session"
           pg_dump "$CONN_URI" --clean --if-exists > backup.sql
           
           # Compress the backup
