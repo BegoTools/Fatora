@@ -22,8 +22,14 @@ jobs:
           DB_HOST: ${{ secrets.SUPABASE_DB_HOST }}
           DB_USER: ${{ secrets.SUPABASE_DB_USER }}
         run: |
-          # Use pg_dump to extract schema, data, and permissions (RLS)
-          pg_dump -h $DB_HOST -p 5432 -U $DB_USER -d postgres --clean --if-exists > backup.sql
+          echo "Checking if secrets are set..."
+          if [ -z "$DB_HOST" ]; then echo "Error: SUPABASE_DB_HOST is empty!"; exit 1; fi
+          if [ -z "$DB_USER" ]; then echo "Error: SUPABASE_DB_USER is empty!"; exit 1; fi
+          if [ -z "$PGPASSWORD" ]; then echo "Error: SUPABASE_DB_PASSWORD is empty!"; exit 1; fi
+          
+          echo "Connecting to $DB_HOST on port 6543..."
+          # Use port 6543 (IPv4 pooler) to avoid GitHub Actions IPv6 connection issues
+          pg_dump -h $DB_HOST -p 6543 -U $DB_USER -d postgres --clean --if-exists > backup.sql
           
           # Compress the backup
           gzip backup.sql
