@@ -23,12 +23,45 @@ jobs:
           DB_USER: ${{ secrets.SUPABASE_DB_USER }}
         run: |
           echo "Checking if secrets are set..."
-          if [ -z "$DB_HOST" ]; then echo "Error: SUPABASE_DB_HOST is empty!"; exit 1; fi
-          if [ -z "$DB_USER" ]; then echo "Error: SUPABASE_DB_USER is empty!"; exit 1; fi
-          if [ -z "$PGPASSWORD" ]; then echo "Error: SUPABASE_DB_PASSWORD is empty!"; exit 1; fi
+          if [ -z "$DB_HOST" ] || [ -z "$DB_USER" ] || [ -z "$PGPASSWORD" ]; then
+            echo "Error: One or more SUPABASE secrets are empty! Please check GitHub Secrets."
+            exit 1
+          fi
           
-          echo "Connecting to $DB_HOST on port 6543..."
-          # Use port 6543 (IPv4 pooler) to avoid GitHub Actions IPv6 connection issues
+          # Detect IPv6 Direct URL and auto-convert to IPv4 Pooler URL
+          if [[ "$DB_HOST" == db.*.supabase.co ]]; then
+            echo "Detected direct IPv6 host ($DB_HOST). GitHub Actions requires IPv4."
+            PROJECT_REF=$(echo "$DB_HOST" | cut -d'.' -f2)
+            
+            # Pooler requires user format: postgres.[project-ref]
+            if [[ "$DB_USER" != *".$PROJECT_REF" ]]; then
+              DB_USER="${DB_USER}.${PROJECT_REF}"
+            fi
+            
+            echo "Scanning for Supavisor Pooler region for project $PROJECT_REF..."
+            REGIONS=("eu-central-1" "us-east-1" "eu-west-1" "eu-west-2" "eu-west-3" "ap-southeast-1" "ap-south-1" "us-west-1" "us-west-2" "sa-east-1" "ca-central-1" "ap-southeast-2" "ap-northeast-1" "ap-northeast-2" "ap-east-1" "eu-north-1")
+            
+            FOUND_HOST=""
+            for region in "${REGIONS[@]}"; do
+              TEST_HOST="aws-0-$region.pooler.supabase.com"
+              echo "Trying region $region..."
+              if PGCONNECT_TIMEOUT=2 PGPASSWORD="$PGPASSWORD" psql -h "$TEST_HOST" -p 6543 -U "$DB_USER" -d postgres -c "SELECT 1;" >/dev/null 2>&1; then
+                echo "Success! Found active pooler at $TEST_HOST"
+                FOUND_HOST="$TEST_HOST"
+                break
+              fi
+            done
+            
+            if [ -z "$FOUND_HOST" ]; then
+              echo "Error: Auto-discovery failed. Could not locate your database region."
+              echo "Please update your GitHub Secret SUPABASE_DB_HOST to the 'Connection Pooler' host (e.g. aws-0-xxx.pooler.supabase.com) from your Supabase Dashboard."
+              exit 1
+            fi
+            DB_HOST="$FOUND_HOST"
+          fi
+          
+          echo "Proceeding with backup on $DB_HOST..."
+          # Connect to the pooler (6543)
           pg_dump -h $DB_HOST -p 6543 -U $DB_USER -d postgres --clean --if-exists > backup.sql
           
           # Compress the backup
