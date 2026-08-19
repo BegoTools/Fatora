@@ -33,10 +33,56 @@ export function setFileCache(state: AppState): void {
   fileCache = state;
 }
 
+export async function forceSync(): Promise<boolean> {
+  const local = await idbGet<AppState>('state');
+  const hasPendingSync = await idbGet<boolean>('hasPendingSync');
+  
+  if (!hasPendingSync || !local) return true;
+  
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('sync-status', { detail: 'syncing' }));
+  }
+  
+  try {
+    const user = await getCurrentUser();
+    if (user && user.teamId) {
+      const { error } = await supabase
+        .from('team_data')
+        .update({ state_json: local, updated_at: new Date().toISOString() })
+        .eq('team_id', user.teamId);
+      
+      if (!error) {
+         await idbSet('hasPendingSync', false);
+         if (typeof window !== 'undefined') {
+           window.dispatchEvent(new CustomEvent('sync-status', { detail: 'success' }));
+         }
+         return true;
+      }
+    }
+  } catch(e) {
+    console.error('forceSync failed:', e);
+  }
+  
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('sync-status', { detail: 'error' }));
+  }
+  return false;
+}
+
 export async function loadFromFile(): Promise<AppState | null> {
   const user = await getCurrentUser();
+  const local = await idbGet<AppState>('state');
+  const hasPendingSync = await idbGet<boolean>('hasPendingSync');
+
+  // If we have local changes that haven't been pushed yet, 
+  // DO NOT overwrite them with older cloud data. Push them first!
+  if (hasPendingSync && local) {
+    await forceSync();
+    fileCache = local;
+    return local;
+  }
+
   if (!user || !user.teamId) {
-    const local = await idbGet<AppState>('state');
     return local || null;
   }
 
@@ -50,7 +96,6 @@ export async function loadFromFile(): Promise<AppState | null> {
 
     if (error || !data) {
       // If network error or no data returned, fallback to local
-      const local = await idbGet<AppState>('state');
       return local || null;
     }
 
@@ -65,9 +110,9 @@ export async function loadFromFile(): Promise<AppState | null> {
     const state = data.state_json as AppState;
     fileCache = state;
     await idbSet('state', state); // Local backup
+    await idbSet('hasPendingSync', false);
     return state;
   } catch {
-    const local = await idbGet<AppState>('state');
     return local || null;
   }
 }
@@ -84,6 +129,9 @@ export function saveToFile(state: AppState): Promise<void> {
         await idbSet('state', currentState); // Local backup
         const user = await getCurrentUser();
         if (user && user.teamId) {
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('sync-status', { detail: 'syncing' }));
+          }
           const { error } = await supabase
             .from('team_data')
             .update({ state_json: currentState, updated_at: new Date().toISOString() })
@@ -91,10 +139,23 @@ export function saveToFile(state: AppState): Promise<void> {
           
           if (error) {
             console.error('Supabase save error:', error.message);
+            await idbSet('hasPendingSync', true);
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('sync-status', { detail: 'error' }));
+            }
+          } else {
+            await idbSet('hasPendingSync', false);
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('sync-status', { detail: 'success' }));
+            }
           }
         }
       } catch (err) {
         console.error('fileStore: failed to save to supabase:', err);
+        await idbSet('hasPendingSync', true);
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('sync-status', { detail: 'error' }));
+        }
       }
     });
     writeQueue = run.catch(() => { /* ignore */ });

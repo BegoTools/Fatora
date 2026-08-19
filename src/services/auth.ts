@@ -13,11 +13,29 @@ async function getUserWithTeam(supabaseUser: SupabaseUser | undefined | null): P
   if (!supabaseUser) return null;
   const { data: teamMember, error } = await supabase
     .from('team_members')
-    .select('team_id, role, name, email')
+    .select('id, team_id, role, name, email')
     .eq('user_id', supabaseUser.id)
     .single();
 
   if (error || !teamMember) return null;
+
+  // Fetch explicit permissions
+  const { data: perms } = await supabase
+    .from('permissions')
+    .select('module, can_view, can_create, can_edit, can_delete')
+    .eq('team_member_id', teamMember.id);
+
+  const permissions: Record<string, { can_view: boolean, can_create: boolean, can_edit: boolean, can_delete: boolean }> = {};
+  if (perms) {
+    for (const p of perms) {
+      permissions[p.module] = {
+        can_view: p.can_view,
+        can_create: p.can_create,
+        can_edit: p.can_edit,
+        can_delete: p.can_delete,
+      };
+    }
+  }
 
   return {
     id: supabaseUser.id,
@@ -26,6 +44,8 @@ async function getUserWithTeam(supabaseUser: SupabaseUser | undefined | null): P
     role: teamMember.role as UserRole,
     isActive: true,
     teamId: teamMember.team_id,
+    teamMemberId: teamMember.id,
+    permissions,
   };
 }
 
@@ -216,13 +236,19 @@ export async function updateAccount(
 
   if (Object.keys(updateData).length === 0) return { ok: true };
 
-  const { error } = await supabase
+  const { data: memberData, error } = await supabase
     .from('team_members')
     .update(updateData)
     .eq('user_id', id)
-    .eq('team_id', currentUser.teamId);
+    .eq('team_id', currentUser.teamId)
+    .select('id')
+    .single();
 
   if (error) return { ok: false, error: error.message };
+  
+  if (changes.role && memberData) {
+    await syncUserPermissions(memberData.id, changes.role);
+  }
   
   return { ok: true };
 }
@@ -253,3 +279,28 @@ export async function changePassword(userId: string, _oldPassword: string, newPa
 
   return { ok: true };
 }
+
+// Sync permissions from the role to the DB permissions table
+import { getRoles } from './roles';
+
+export async function syncUserPermissions(teamMemberId: string, roleId: string): Promise<void> {
+  if (roleId === 'owner') return; // Owners bypass everything anyway
+  const roles = await getRoles();
+  const role = roles.find(r => r.id === roleId);
+  if (!role) return;
+
+  const permsToInsert = Object.entries(role.permissions).map(([module, p]) => ({
+    team_member_id: teamMemberId,
+    module,
+    can_view: p.view || false,
+    can_create: p.create || false,
+    can_edit: p.edit || false,
+    can_delete: p.delete || false,
+    updated_at: new Date().toISOString(),
+  }));
+
+  if (permsToInsert.length > 0) {
+    await supabase.from('permissions').upsert(permsToInsert, { onConflict: 'team_member_id, module' });
+  }
+}
+

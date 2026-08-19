@@ -1,0 +1,44 @@
+name: Daily Supabase Backup
+
+on:
+  schedule:
+    # Run every day at 02:00 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Install PostgreSQL Client
+        run: sudo apt-get install -y postgresql-client
+
+      - name: Backup Database
+        env:
+          PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          DB_HOST: ${{ secrets.SUPABASE_DB_HOST }}
+          DB_USER: ${{ secrets.SUPABASE_DB_USER }}
+        run: |
+          # Use pg_dump to extract schema, data, and permissions (RLS)
+          pg_dump -h $DB_HOST -p 5432 -U $DB_USER -d postgres --clean --if-exists > backup.sql
+          
+          # Compress the backup
+          gzip backup.sql
+
+      - name: Encrypt Backup
+        env:
+          ENCRYPTION_PASSWORD: ${{ secrets.BACKUP_ENCRYPTION_PASSWORD }}
+        run: |
+          # Encrypt using OpenSSL AES-256-CBC
+          openssl enc -aes-256-cbc -salt -pbkdf2 -in backup.sql.gz -out backup.sql.gz.enc -pass pass:$ENCRYPTION_PASSWORD
+          rm backup.sql.gz
+
+      - name: Upload Backup Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: supabase-backup-${{ github.run_id }}
+          path: backup.sql.gz.enc
+          retention-days: 7 # Automatically deleted after 7 days by GitHub

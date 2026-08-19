@@ -316,6 +316,43 @@ export async function updateRole(
   };
   const next = roles.map(r => (r.id === id ? updated : r));
   await saveRoles(next);
+
+  // Sync these updated permissions to all users who have this role
+  if (changes.permissions) {
+    try {
+      const user = await getCurrentUser();
+      if (user && user.teamId) {
+        const { data: members } = await supabase
+          .from('team_members')
+          .select('id')
+          .eq('team_id', user.teamId)
+          .eq('role', id);
+        
+        if (members && members.length > 0) {
+          const permsToInsert: any[] = [];
+          for (const member of members) {
+            for (const [module, p] of Object.entries(updated.permissions)) {
+              permsToInsert.push({
+                team_member_id: member.id,
+                module,
+                can_view: p.view || false,
+                can_create: p.create || false,
+                can_edit: p.edit || false,
+                can_delete: p.delete || false,
+                updated_at: new Date().toISOString(),
+              });
+            }
+          }
+          if (permsToInsert.length > 0) {
+            await supabase.from('permissions').upsert(permsToInsert, { onConflict: 'team_member_id, module' });
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Failed to sync updated role permissions to users:', err);
+    }
+  }
+
   return { ok: true, role: updated };
 }
 

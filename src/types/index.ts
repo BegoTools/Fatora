@@ -386,6 +386,8 @@ export interface User {
   avatar?: string;
   isActive: boolean;
   teamId?: string;
+  teamMemberId?: string; // Add this to query permissions
+  permissions?: Record<string, { can_view: boolean, can_create: boolean, can_edit: boolean, can_delete: boolean }>;
 }
 
 // حساب المصادقة المحلي (يُخزَّن في IndexedDB مع كلمة سر مُشفَّرة)

@@ -50,10 +50,34 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [darkMode, setDarkMode] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<'success' | 'syncing' | 'error' | 'offline'>('success');
   const notificationsRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
 
   const isRTL = i18n.language === 'ar';
+
+  useEffect(() => {
+    const handleSync = (e: any) => setSyncStatus(e.detail);
+    const handleOnline = () => {
+      setSyncStatus('syncing');
+      import('@/db/fileStore').then(({ forceSync }) => forceSync());
+    };
+    const handleOffline = () => setSyncStatus('offline');
+    
+    window.addEventListener('sync-status', handleSync);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    
+    if (!navigator.onLine) {
+      setSyncStatus('offline');
+    }
+    
+    return () => {
+      window.removeEventListener('sync-status', handleSync);
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -294,6 +318,19 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </div>
 
             <div className={`flex items-center gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
+              {/* Sync Status Indicator */}
+              <div className="flex items-center gap-1.5 px-2 py-1 bg-muted rounded-full" title={syncStatus === 'error' ? (isRTL ? 'توجد تغييرات لم تُحفظ في السحابة. انقر للمحاولة.' : 'Unsaved changes. Click to retry.') : ''}>
+                {syncStatus === 'syncing' && <span className="flex h-2 w-2 rounded-full bg-blue-500 animate-pulse"></span>}
+                {syncStatus === 'success' && <span className="flex h-2 w-2 rounded-full bg-emerald-500"></span>}
+                {syncStatus === 'error' && <button onClick={() => import('@/db/fileStore').then(({ forceSync }) => forceSync())} className="flex h-2 w-2 rounded-full bg-red-500 hover:bg-red-600 cursor-pointer"></button>}
+                {syncStatus === 'offline' && <span className="flex h-2 w-2 rounded-full bg-gray-400"></span>}
+                <span className="text-[10px] text-muted-foreground hidden sm:block font-medium">
+                  {syncStatus === 'syncing' ? (isRTL ? 'جاري المزامنة...' : 'Syncing...') :
+                   syncStatus === 'success' ? (isRTL ? 'متزامن' : 'Synced') :
+                   syncStatus === 'error' ? (isRTL ? 'خطأ في المزامنة' : 'Sync Error') :
+                   (isRTL ? 'غير متصل' : 'Offline')}
+                </span>
+              </div>
               <div className="relative">
                 <button
                   onClick={() => setSearchOpen(!searchOpen)}

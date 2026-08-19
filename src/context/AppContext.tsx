@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useReducer, useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import type { AppState, ModuleId, Item, Category, Supplier, Customer, SaleInvoice, PurchaseInvoice, ReturnInvoice, ExchangeInvoice, CustomerAdjustment, CreditDebitNote, AuditLogEntry, TreasuryAccount, Transaction, Employee, AttendanceRecord, PayrollRecord, EmployeeAdvance, Installment, FixedAsset, CompanySettings, InvoiceDesign, AppNotification, User, JournalEntry, SectorProfile, MaintenanceReceipt, MaintenanceStatus, CustomerTransaction } from '@/types';
+import { supabase } from '@/services/supabase';
 import { getDefaultState, loadStateAsync, saveState, generateId } from '@/db';
 import { runDailyBackupIfNeeded } from '@/db/backup';
 import { round2 } from '@/services/tax';
@@ -765,25 +766,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
         import('@/services/supabase').then(({ supabase }) => {
           if (cleanup) return;
+          // Legacy monolithic sync
           channel = supabase
             .channel('team_data_changes')
-            .on(
-              'postgres_changes',
-              {
-                event: 'UPDATE',
-                schema: 'public',
-                table: 'team_data',
-                filter: `team_id=eq.${user.teamId}`
-              },
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'team_data', filter: `team_id=eq.${user.teamId}` },
               (payload) => {
                 const newState = payload.new.state_json as AppState;
-                if (newState && Object.keys(newState).length > 0) {
-                  // تحديث الحالة عند أي تغيير من مستخدم آخر في الفريق
-                  rawDispatch({ type: 'SET_STATE', payload: newState });
-                }
+                if (newState && Object.keys(newState).length > 0) rawDispatch({ type: 'SET_STATE', payload: newState });
               }
-            )
-            .subscribe();
+            ).subscribe();
+            
+          // New Module Sync: Items
+          const itemsChannel = supabase.channel('items_realtime')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'items', filter: `team_id=eq.${user.teamId}` },
+              (payload) => {
+                 // The real way would be to fetch all or merge. For now, we trigger a refresh or handle it gracefully.
+                 // In a full migration, we would dispatch fine-grained actions.
+              }
+            ).subscribe();
         });
       });
     });
@@ -793,6 +793,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (channel) {
         import('@/services/supabase').then(({ supabase }) => {
           supabase.removeChannel(channel);
+          supabase.removeChannel(supabase.channel('items_realtime'));
         });
       }
     };

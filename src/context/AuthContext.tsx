@@ -83,6 +83,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         )
         .subscribe();
 
+      const permissionsChannel = supabase
+        .channel('permissions_changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'permissions',
+            // Only care about this user's permissions, but we can't filter by team_id easily here since permissions only has team_member_id.
+            // But if we have user.teamMemberId we can filter.
+          },
+          (payload) => {
+             // To be safe, just refresh.
+             refresh();
+          }
+        )
+        .subscribe();
+
       const dataChannel = supabase
         .channel('team_data_roles_changes')
         .on(
@@ -102,6 +120,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       return () => {
         supabase.removeChannel(memberChannel);
+        supabase.removeChannel(permissionsChannel);
         supabase.removeChannel(dataChannel);
       };
     });
@@ -139,10 +158,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     (module: PermissionModule, action: PermissionAction = 'view') => {
       if (!user) return false;
       if (user.role === 'owner') return true;
-      const role = roles.find(r => r.id === user.role);
-      return roleCan(role, module, action);
+      if (user.permissions && user.permissions[module]) {
+         const p = user.permissions[module];
+         if (action === 'view') return p.can_view;
+         if (action === 'create') return p.can_create;
+         if (action === 'edit') return p.can_edit;
+         if (action === 'delete') return p.can_delete;
+      }
+      return false; // Fallback to false if no explicit DB permissions
     },
-    [user, roles],
+    [user],
   );
 
   const value: AuthContextValue = {
