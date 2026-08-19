@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useReducer, useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import type { AppState, ModuleId, Item, Category, Supplier, Customer, SaleInvoice, PurchaseInvoice, ReturnInvoice, ExchangeInvoice, CustomerAdjustment, CreditDebitNote, AuditLogEntry, TreasuryAccount, Transaction, Employee, AttendanceRecord, PayrollRecord, EmployeeAdvance, Installment, FixedAsset, CompanySettings, InvoiceDesign, AppNotification, User, JournalEntry, SectorProfile, MaintenanceReceipt, MaintenanceStatus, CustomerTransaction } from '@/types';
-import { supabase } from '@/services/supabase';
 import { getDefaultState, loadStateAsync, saveState, generateId } from '@/db';
 import { runDailyBackupIfNeeded } from '@/db/backup';
 import { round2 } from '@/services/tax';
@@ -777,11 +776,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             ).subscribe();
             
           // New Module Sync: Items
-          const itemsChannel = supabase.channel('items_realtime')
+          supabase.channel('items_realtime')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'items', filter: `team_id=eq.${user.teamId}` },
-              (payload) => {
+              () => {
                  // The real way would be to fetch all or merge. For now, we trigger a refresh or handle it gracefully.
-                 // In a full migration, we would dispatch fine-grained actions.
               }
             ).subscribe();
         });

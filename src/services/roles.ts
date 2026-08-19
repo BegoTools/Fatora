@@ -229,7 +229,7 @@ export async function getRoles(): Promise<RoleDefinition[]> {
 }
 
 async function saveRoles(roles: RoleDefinition[]): Promise<void> {
-  const customRoles = roles.filter(r => r.id !== 'owner' && !isSystemRoleId(r.id));
+  const customRoles = roles.filter(r => r.id !== 'owner');
   await idbSet(ROLES_KEY, customRoles);
   
   try {
@@ -334,6 +334,7 @@ export async function updateRole(
             for (const [module, p] of Object.entries(updated.permissions)) {
               permsToInsert.push({
                 team_member_id: member.id,
+                team_id: user.teamId,
                 module,
                 can_view: p.view || false,
                 can_create: p.create || false,
@@ -344,7 +345,17 @@ export async function updateRole(
             }
           }
           if (permsToInsert.length > 0) {
-            await supabase.from('permissions').upsert(permsToInsert, { onConflict: 'team_member_id, module' });
+            const { error: upsertErr } = await supabase.from('permissions').upsert(permsToInsert, { onConflict: 'team_member_id, module' });
+            if (upsertErr) console.warn('updateRole permissions sync warning:', upsertErr.message);
+            
+            // Broadcast the change to immediately update connected clients
+            for (const member of members) {
+              await supabase.channel(`team_${user.teamId}`).send({
+                type: 'broadcast',
+                event: 'permissions_updated',
+                payload: { team_member_id: member.id }
+              });
+            }
           }
         }
       }

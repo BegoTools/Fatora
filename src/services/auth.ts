@@ -19,22 +19,26 @@ async function getUserWithTeam(supabaseUser: SupabaseUser | undefined | null): P
 
   if (error || !teamMember) return null;
 
-  // Fetch explicit permissions
-  const { data: perms } = await supabase
-    .from('permissions')
-    .select('module, can_view, can_create, can_edit, can_delete')
-    .eq('team_member_id', teamMember.id);
-
+  // Fetch explicit permissions (safely handle if permissions table is not initialized)
   const permissions: Record<string, { can_view: boolean, can_create: boolean, can_edit: boolean, can_delete: boolean }> = {};
-  if (perms) {
-    for (const p of perms) {
-      permissions[p.module] = {
-        can_view: p.can_view,
-        can_create: p.can_create,
-        can_edit: p.can_edit,
-        can_delete: p.can_delete,
-      };
+  try {
+    const { data: perms } = await supabase
+      .from('permissions')
+      .select('module, can_view, can_create, can_edit, can_delete')
+      .eq('team_member_id', teamMember.id);
+
+    if (perms) {
+      for (const p of perms) {
+        permissions[p.module] = {
+          can_view: p.can_view,
+          can_create: p.can_create,
+          can_edit: p.can_edit,
+          can_delete: p.can_delete,
+        };
+      }
     }
+  } catch (permErr) {
+    console.warn('Could not fetch permissions table:', permErr);
   }
 
   return {
@@ -210,6 +214,27 @@ export async function adminCreateAccount(
   }
   if (!data.user) return { ok: false, error: 'unknown_error' };
 
+  // Wait for the trigger to create the team_member record
+  let memberId = null;
+  for (let i = 0; i < 5; i++) {
+    const { data: memberData } = await supabase
+      .from('team_members')
+      .select('id')
+      .eq('user_id', data.user.id)
+      .eq('team_id', currentUser.teamId)
+      .maybeSingle();
+      
+    if (memberData) {
+      memberId = memberData.id;
+      break;
+    }
+    await new Promise(r => setTimeout(r, 400));
+  }
+
+  if (memberId) {
+    await syncUserPermissions(memberId, role);
+  }
+
   return { 
     ok: true, 
     user: {
@@ -248,6 +273,12 @@ export async function updateAccount(
   
   if (changes.role && memberData) {
     await syncUserPermissions(memberData.id, changes.role);
+    // Broadcast the change to immediately update connected clients
+    await supabase.channel(`team_${currentUser.teamId}`).send({
+      type: 'broadcast',
+      event: 'permissions_updated',
+      payload: { team_member_id: memberData.id }
+    });
   }
   
   return { ok: true };
@@ -289,6 +320,17 @@ export async function syncUserPermissions(teamMemberId: string, roleId: string):
   const role = roles.find(r => r.id === roleId);
   if (!role) return;
 
+  // Resolve the team_id for this member (needed by the permissions table)
+  let teamId: string | null = null;
+  try {
+    const { data: memberRow } = await supabase
+      .from('team_members')
+      .select('team_id')
+      .eq('id', teamMemberId)
+      .single();
+    teamId = memberRow?.team_id ?? null;
+  } catch { /* ignore */ }
+
   const permsToInsert = Object.entries(role.permissions).map(([module, p]) => ({
     team_member_id: teamMemberId,
     module,
@@ -297,10 +339,16 @@ export async function syncUserPermissions(teamMemberId: string, roleId: string):
     can_edit: p.edit || false,
     can_delete: p.delete || false,
     updated_at: new Date().toISOString(),
+    ...(teamId ? { team_id: teamId } : {}),
   }));
 
   if (permsToInsert.length > 0) {
-    await supabase.from('permissions').upsert(permsToInsert, { onConflict: 'team_member_id, module' });
+    try {
+      const { error } = await supabase.from('permissions').upsert(permsToInsert, { onConflict: 'team_member_id, module' });
+      if (error) console.warn('syncUserPermissions database warning:', error.message);
+    } catch (err) {
+      console.warn('syncUserPermissions exception:', err);
+    }
   }
 }
 

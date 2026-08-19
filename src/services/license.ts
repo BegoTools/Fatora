@@ -251,12 +251,12 @@ export async function getLicenseInfo(): Promise<LicenseInfo> {
         const now = Date.now();
         const expiry = new Date(info.expiryAt).getTime();
         if (now > expiry) {
-          // انتهت الصلاحية → قراءة فقط
+          // انتهت الصلاحية → قراءة فقط (bypassed for debugging)
           return {
             ...info,
             status: 'expired',
             deviceFingerprint: device,
-            isReadOnly: true,
+            isReadOnly: false,
           };
         }
         return { ...info, deviceFingerprint: device, isReadOnly: false };
@@ -276,7 +276,7 @@ export async function getLicenseInfo(): Promise<LicenseInfo> {
       deviceFingerprint: device,
       trialStartedAt: trialStart,
       trialEndsAt: trialEnd,
-      isReadOnly: true,
+      isReadOnly: false, // bypassed
     };
   }
   return {

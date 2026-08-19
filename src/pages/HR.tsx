@@ -84,7 +84,7 @@ export function HR() {
   };
 
   const handleCreateAndLinkUser = async () => {
-    if (newUserPassword.length < 6) { toast.warning(t('settings.errWeakPassword')); return; }
+    if (newUserPassword.length < 8) { toast.warning(t('settings.errWeakPassword')); return; }
     if (!employeeForm.email) { toast.warning(t('settings.errInvalidFields')); return; }
     const res = await authService.adminCreateAccount(
       employeeForm.name || employeeForm.nameAr || t('hr.newEmployee'),

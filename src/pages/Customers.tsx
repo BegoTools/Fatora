@@ -17,7 +17,7 @@ export function Customers() {
   const isRTL = i18n.language === 'ar';
   const { state, dispatch } = useApp();
   const { user, can } = useAuth();
-  const canAdjustCustomerBalance = user?.role === 'owner' || user?.role === 'admin';
+  const canAdjustCustomerBalance = can('customers', 'edit');
   const { customers, salesInvoices, returns, exchanges, customerAdjustments } = state.data;
 
   const [search, setSearch] = useState('');

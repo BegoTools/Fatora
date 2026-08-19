@@ -3,7 +3,7 @@ import type { User } from '@/types';
 import type { RoleDefinition, PermissionModule, PermissionAction } from '@/types/permissions';
 import * as authService from '@/services/auth';
 import type { AuthResult } from '@/services/auth';
-import { getRoles, roleCan } from '@/services/roles';
+import { getRoles } from '@/services/roles';
 
 interface AuthContextValue {
   user: User | null;
@@ -84,19 +84,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .subscribe();
 
       const permissionsChannel = supabase
-        .channel('permissions_changes')
+        .channel(`team_${user.teamId}`)
         .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'permissions',
-            // Only care about this user's permissions, but we can't filter by team_id easily here since permissions only has team_member_id.
-            // But if we have user.teamMemberId we can filter.
-          },
+          'broadcast',
+          { event: 'permissions_updated' },
           (payload) => {
-             // To be safe, just refresh.
-             refresh();
+             // If the broadcast is for this specific user, or a general update (no ID), refresh!
+             if (!payload.payload?.team_member_id || payload.payload.team_member_id === user.teamMemberId) {
+               refresh();
+             }
           }
         )
         .subscribe();
