@@ -61,10 +61,9 @@ jobs:
           fi
           
           echo "Proceeding with backup on $DB_HOST..."
-          # Connect to the pooler (6543) using session pool mode which is required for pg_dump
-          # Note: Password is automatically picked up from the PGPASSWORD environment variable!
-          CONN_URI="postgresql://${DB_USER}@${DB_HOST}:6543/postgres?pool_mode=session"
-          pg_dump "$CONN_URI" --clean --if-exists > backup.sql
+          # Connect to the pooler using port 5432 (Session mode on IPv4 pooler)
+          # PGPASSWORD environment variable is used automatically for authentication
+          pg_dump -h "$DB_HOST" -p 5432 -U "$DB_USER" -d postgres --clean --if-exists > backup.sql
           
           # Compress the backup
           gzip backup.sql
