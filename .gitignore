@@ -30,5 +30,11 @@ dist-ssr
 
 # Antigravity agents
 .agents/
-testsprite_tests/tmp/
-testsprite_tests/tmp/config.json
+
+# Test/debug artifacts (regenerated, never needed in repo)
+scratch/
+testsprite_tests/
+
+# pnpm (project uses npm)
+pnpm-lock.yaml
+pnpm-workspace.yaml
