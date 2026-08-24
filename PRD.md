@@ -1,135 +1,377 @@
-# Product Requirement Document (PRD)
-## Easy Store ERP (Fatora) — Next-Generation Multi-Sector Retail & Wholesale ERP System
+# Product Requirements Document (PRD)
+## Easy Store ERP (Fatora) — Enterprise Multi-Sector Retail & Wholesale Management System
+
+---
+
+## Document Metadata
+
+| Attribute | Specification |
+| :--- | :--- |
+| **Product Name** | Easy Store ERP (Codename: *Fatora*) |
+| **Document Version** | 2.0.0 (Comprehensive Specification) |
+| **Author / Team** | Core Engineering & Product Architecture Team |
+| **Target Platform** | Desktop (Windows, macOS, Linux via Tauri v2) & Web (Modern Browsers) |
+| **Primary Stack** | React 19, TypeScript 5.9, Vite 7, Tailwind CSS v3.4, Radix UI (`shadcn/ui`) |
+| **Persistence Stack**| Local-First Atomic JSON File Store + IndexedDB with Supabase Cloud PostgreSQL Sync |
+| **Internationalization**| Bi-directional Arabic (`ar`, RTL) & English (`en`, LTR) with zero missing keys guarantee |
+| **Classification** | Proprietary Commercial Software Specification |
 
 ---
 
 ## 1. Executive Summary & Vision
 
 ### 1.1 Executive Summary
-**Easy Store ERP** (internally code-named *Fatora*) is a high-performance, cross-platform, local-first Enterprise Resource Planning (ERP) and Point of Sale (POS) application. Engineered for small to medium-sized retail stores, pharmacies, supermarkets, electronics centers, apparel outlets, and maintenance workshops, Easy Store ERP provides offline-first reliability paired with seamless real-time cloud synchronization via Supabase.
+**Easy Store ERP** (internally codenamed **Fatora**) is a high-performance, cross-platform, local-first Enterprise Resource Planning (ERP) and Point of Sale (POS) system engineered for small-to-medium enterprises (SMEs). The system natively unifies POS checkout, multi-warehouse inventory, customer and supplier credit ledgers, automated double-entry accounting, employee payroll & attendance, workshop/maintenance service tracking, and electronic tax invoicing (ETA / ZATCA compliant).
 
-### 1.2 Vision Statement
-To empower business owners with a hyper-responsive, multi-sector ERP solution that streamlines point-of-sale operations, inventory tracking, customer credit ledgers, double-entry accounting, payroll, and maintenance management while requiring zero ongoing maintenance overhead.
+Built on a **Local-First Architecture**, Easy Store ERP guarantees 100% operational continuity without internet access, utilizing local atomic disk persistence and IndexedDB, while providing real-time multi-terminal cloud synchronization via Supabase when connectivity is available.
 
----
+### 1.2 Vision & Core Value Proposition
+To deliver an ultra-responsive, zero-maintenance, multi-sector ERP solution that eliminates cloud latency and subscription lock-in, enabling store owners to manage sales, stock, accounting, and repairs with military-grade reliability and mathematical precision.
 
-## 2. System Architecture & Tech Stack
-
-### 2.1 Technology Stack Overview
-* **Frontend Framework**: React 18, TypeScript (Strict Mode), Vite 7.
-* **Styling & UI Design**: Tailwind CSS v3.4 (with custom CSS design tokens), `shadcn/ui` components, Lucide Icons, and dynamic theme injectors.
-* **Desktop Runtime**: Tauri v2 (Rust backend wrapper) for native OS access, direct hardware printing support, and local database management.
-* **Local Persistence Layer**: Local-first architecture utilizing IndexedDB and local storage with fallback to JSON repositories.
-* **Cloud Database & Sync Engine**: Supabase (PostgreSQL), with Realtime WebSocket sync, Row Level Security (RLS), and Team-based Multi-tenancy migration support.
-* **Internationalization**: Bilingual core engine (Arabic - `ar` & English - `en`) with complete Right-to-Left (RTL) and Left-to-Right (LTR) support.
-* **Export & Reporting Engine**: Native client-side PDF and Excel export using `xlsx` / `exceljs` engines.
-
-### 2.2 System Architecture Diagram
-```
-+-------------------------------------------------------------------+
-|                        Easy Store ERP Client                      |
-|                                                                   |
-|  +-------------------+  +-------------------+  +---------------+  |
-|  |   POS & Checkout  |  | Inventory & Unit  |  |  Customer DB  |  |
-|  |     Engine        |  |    Conversions    |  |  & Ledger     |  |
-|  +---------+---------+  +---------+---------+  +-------+-------+  |
-|            |                      |                    |          |
-|  +---------v----------------------v--------------------v-------+  |
-|  |                Double-Entry Accounting Engine               |  |
-|  +--------------------------------+----------------------------+  |
-|                                   |                               |
-|  +--------------------------------v----------------------------+  |
-|  |               IDataRepository / Local State                 |  |
-|  |            (IndexedDB / Offline First Storage)              |  |
-|  +--------------------------------+----------------------------+  |
-+-----------------------------------|-------------------------------+
-                                    | Auto Sync Engine
-                                    v
-+-------------------------------------------------------------------+
-|                      Supabase Cloud Backend                       |
-|          PostgreSQL Database + Realtime Sync + RLS Policies       |
-+-------------------------------------------------------------------+
-```
+### 1.3 Key Market Verticals & Sector Profiles
+Easy Store ERP dynamically configures its UI, validation schemas, and database workflows according to the selected **Sector Profile**:
+1. **General Retail & Wholesale**: Fast barcode sales, multi-tier pricing (retail/wholesale), installment plans.
+2. **Supermarket & Grocery**: Integrated weight-scale barcode parsing (`21xxxxxWWWWWC`), shelf-life & expiry tracking, quick-select touch grids.
+3. **Clothing & Apparel**: Multi-dimensional matrix tracking (Size, Color, Brand), variant barcoding.
+4. **Electronics & Appliances**: Serial number tracking (`IMEI`/`SN`), warranty management, installment schedules.
+5. **Workshop & Maintenance**: Device intake ticketing, stage workflow, technician commission tracking, repair receipt printing.
+6. **Cosmetics & Pharmaceuticals**: Batch number management, expiration alerts, sub-unit packaging conversions.
+7. **Distribution & Vans**: Multi-warehouse stock transfers, driver inventory tracking, field invoices.
 
 ---
 
-## 3. User Roles & Permission Matrix (RBAC)
+## 2. Technical Architecture & System Design
 
-### 3.1 Role Hierarchy
-Easy Store ERP features a granular Role-Based Access Control (RBAC) framework supporting built-in system roles as well as custom organization-defined roles:
+### 2.1 High-Level Architecture Diagram
 
-1. **Owner**: Unrestricted full access to system settings, team management, financial accounts, manual adjustments, and system resets.
-2. **Admin**: Operational superuser with privileges to manage inventory, customers, suppliers, staff, and system configuration.
-3. **Manager**: Branch/store operational oversight, inventory adjustments, approval of payroll drafts, and reporting access.
-4. **Accountant**: Full access to financial ledgers, double-entry journal entries, audit logs, treasury reconciliation, and tax filings.
-5. **Sales / Cashier**: Fast POS checkout, invoice printing, customer lookup, and basic returns processing.
-6. **Warehouse Specialist**: Stock intake, inventory audits, stock transfers, bundle assembly/disassembly.
-7. **Purchasing Agent**: Supplier balance management, purchase order generation, and stock intake pricing.
-8. **Customer Service / Maintenance Tech**: Device intake, repair work-order tracking, customer status updates.
+```
++---------------------------------------------------------------------------------------+
+|                                  Easy Store ERP Client                                |
+|                                                                                       |
+|  +---------------------------------------------------------------------------------+  |
+|  |                             Presentation & UI Layer                             |  |
+|  |   - React 19 + TypeScript + Tailwind CSS + shadcn/ui + Lucide Icons             |  |
+|  |   - Bi-directional i18n Engine (Arabic RTL / English LTR)                       |  |
+|  |   - Dynamic Theme Engine (CSS Custom Properties / Accent Injection)             |  |
+|  +---------------------------------------------------------------------------------+  |
+|                                         |                                             |
+|  +---------------------------------------------------------------------------------+  |
+|  |                              Business Services Layer                            |  |
+|  |   - POS & Sales Engine           - VAT / Tax Central Engine (Egypt ETA / ZATCA) |  |
+|  |   - Inventory & Warehousing      - Double-Entry Journal Generator               |  |
+|  |   - Customer / Supplier Ledgers  - HR, Payroll & Attendance Processor           |  |
+|  |   - Workshop / Maintenance       - AI Copilot (Online Gemini + Offline NLP)     |  |
+|  |   - Hardware License Engine      - Spreadsheet Invoice Visual Designer          |  |
+|  +---------------------------------------------------------------------------------+  |
+|                                         |                                             |
+|  +---------------------------------------------------------------------------------+  |
+|  |                            Data Access & Persistence                            |  |
+|  |   - IDataRepository Interface (In-Memory Reactive Cache)                         |  |
+|  |   - Tauri FS Plugin (Atomic JSON file write on desktop: app_data/state.json)    |  |
+|  |   - Browser Fallback (IndexedDB / idb storage)                                  |  |
+|  +---------------------------------------------------------------------------------+  |
++------------------------------------------+--------------------------------------------+
+                                           | Async WebSocket Sync / Force Sync
+                                           v
++---------------------------------------------------------------------------------------+
+|                                Supabase Cloud Backend                                 |
+|  - PostgreSQL 15+ Engine with Row Level Security (RLS)                                |
+|  - Multi-Tenant Schema (teams, team_members, team_data)                               |
+|  - Realtime Change Data Capture (CDC) over WebSockets                                 |
++---------------------------------------------------------------------------------------+
+```
 
-### 3.2 Granular Permission Matrix
+### 2.2 Technology Stack
 
-| Module | Can View | Can Create | Can Edit | Can Delete | Allowed Roles |
+| Layer | Technologies & Libraries |
+| :--- | :--- |
+| **Frontend Framework** | React `19.2.0`, React DOM `19.2.0`, TypeScript `5.9.3`, Vite `7.2.4` |
+| **Desktop Runtime** | Tauri `v2.11.1` (Rust backend with `@tauri-apps/plugin-fs`, `@tauri-apps/plugin-dialog`, `@tauri-apps/plugin-os`) |
+| **State & Data Store** | Local-First In-Memory Repository with IndexedDB (`idb`) and Atomic File Store |
+| **Cloud Database / Auth**| Supabase JS Client `2.112.3` (PostgreSQL, Realtime subscriptions, Auth) |
+| **UI Components & Icons**| Radix UI Primitives (40+ headless components), Lucide React `0.562.0` |
+| **Styling & Theming** | Tailwind CSS `3.4.19`, `tailwind-merge`, `clsx`, `tailwindcss-animate` |
+| **Internationalization**| `i18next 26.3.4`, `react-i18next 17.0.8`, `i18next-browser-languagedetector` |
+| **Forms & Validation** | React Hook Form `7.70.0`, Zod `4.3.5`, `@hookform/resolvers` |
+| **Data Viz & Charts** | Recharts `2.15.4` |
+| **Reporting & Export** | `xlsx 0.18.5` (Excel Engine), `jspdf 4.2.1` (PDF Generation), `jszip 3.10.1` |
+| **Hardware & Peripherals**| `jsbarcode 3.12.3`, Native Browser Print API, Weight-scale Barcode Parser |
+| **AI Integration** | Google Gemini API (`@google/genai` client-side REST) + Custom Rule-Based NLP Parser |
+| **Testing & Quality** | Vitest `2.1.9`, ESLint `9.39.1`, Custom i18n validator (`scripts/check-i18n.mjs`) |
+
+---
+
+## 3. User Roles, Security & Granular Access Control (RBAC)
+
+### 3.1 Role Hierarchy & Personas
+
+The system supports built-in immutable system roles alongside user-created custom roles:
+
+1. **Owner (`owner`)**: System superuser with unconditional privileges across all modules, company settings, team management, cryptographic licensing, and database resets.
+2. **Admin (`admin`)**: Operational manager authorized to configure inventory, customers, suppliers, staff, cash accounts, and run financial audits.
+3. **Manager (`manager`)**: Branch supervisor with permissions to manage inventory levels, approve payroll drafts, and inspect operational reports.
+4. **Accountant (`accountant`)**: Financial specialist with full access to ledgers, journal entries, balance sheets, treasury reconciliation, and tax filings.
+5. **Sales / Cashier (`sales` / `cashier`)**: POS front-desk operator restricted to item lookup, fast checkout, invoice issuance, and basic returns.
+6. **Warehouse Specialist (`warehouse`)**: Logistics officer handling stock intake, inter-warehouse transfers, physical audits, and bundle assemblies.
+7. **Purchasing Agent (`purchasing`)**: Supply-chain manager handling purchase invoices, supplier credit balances, and cost allocations.
+8. **Customer Service / Technician (`customer_service` / `employee`)**: Front-desk and repair staff managing workshop receipts, device intake, and repair diagnostics.
+
+### 3.2 Granular Permissions Matrix
+
+Permissions are structured per module with four explicit CRUD actions: `view`, `create`, `edit`, and `delete`.
+
+```typescript
+export type PermissionModule =
+  | 'dashboard' | 'inventory' | 'sales'     | 'customers'
+  | 'returns'   | 'exchange'  | 'purchases' | 'expenses'
+  | 'treasury'  | 'reports'   | 'hr'        | 'settings'  | 'users';
+
+export type PermissionAction = 'view' | 'create' | 'edit' | 'delete';
+```
+
+| System Module | View | Create | Edit | Delete | Default Permitted Roles |
 | :--- | :---: | :---: | :---: | :---: | :--- |
-| **POS / Sales** | Yes | Yes | Admin/Owner | Owner Only | All Roles |
-| **Inventory Management** | Yes | Admin/Manager | Admin/Manager | Owner Only | Owner, Admin, Manager, Warehouse |
-| **Customer Credit Ledger**| Yes | Yes | Admin/Owner | Owner Only | Owner, Admin, Accountant, Sales |
-| **Manual Adjustments** | Yes | Owner/Admin | Owner/Admin | Never | Owner, Admin (with audit reason) |
-| **Treasury & Safe** | Accountant+| Accountant+| Owner Only | Never | Owner, Admin, Accountant |
-| **Double-Entry Journals** | Accountant+| Accountant+| Owner Only | Never | Owner, Accountant |
-| **HR & Payroll** | Admin+ | Admin+ | Admin+ | Owner Only | Owner, Admin, Manager |
-| **Settings & Branding** | Admin+ | Admin+ | Admin+ | Owner Only | Owner, Admin |
+| **Dashboard** | ✅ | ❌ | ❌ | ❌ | All Authenticated Users |
+| **Sales & POS** | ✅ | ✅ | Admin, Owner | Owner Only | Cashier, Sales, Manager, Admin, Owner |
+| **Inventory** | ✅ | Manager+ | Manager+ | Owner Only | Warehouse, Manager, Admin, Owner |
+| **Customers & Ledgers**| ✅ | Sales+ | Admin+ | Owner Only | Sales, Accountant, Manager, Admin, Owner |
+| **Customer Manual Adjust**| ✅ | Admin+ | Admin+ | ❌ (Append-Only) | Admin, Owner (Mandatory Audit Reason) |
+| **Purchases & Suppliers** | ✅ | Purchasing+| Purchasing+| Owner Only | Purchasing, Manager, Admin, Owner |
+| **Returns & Exchanges** | ✅ | Sales+ | Admin+ | Owner Only | Sales, Cashier, Manager, Admin, Owner |
+| **Treasury & Safes** | ✅ | Accountant+| Owner Only | ❌ (Strict Audit) | Accountant, Admin, Owner |
+| **Double-Entry Journals**| ✅ | Accountant+| Owner Only | ❌ (Strict Audit) | Accountant, Owner |
+| **HR & Payroll** | ✅ | Manager+ | Admin+ | Owner Only | Manager, Admin, Owner |
+| **Workshop / Maintenance**| ✅ | Tech+ | Tech+ | Admin+ | Technician, Sales, Manager, Admin, Owner |
+| **Reports & Analytics** | ✅ | ❌ | ❌ | ❌ | Manager, Accountant, Admin, Owner |
+| **System Settings** | ✅ | Admin+ | Admin+ | Owner Only | Admin, Owner |
+| **Users & Permissions** | ✅ | Owner Only | Owner Only | Owner Only | Owner Only |
+
+### 3.3 Security & Authentication Architecture
+* **Local Authentication**: Uses salted SHA-256 password hashing stored within the encrypted IndexedDB / file cache.
+* **Cloud Authentication**: Seamless integration with Supabase Auth (`supabase.auth.signInWithPassword`), maintaining synchronized user session tokens.
+* **Tenant Isolation**: Cloud synchronization enforces Row-Level Security (RLS) policies scoped by `team_id`. Members can only read and mutate state records matching their team association.
 
 ---
 
-## 4. Core Product Modules & Requirements
+## 4. Core Functional Modules & Detailed Requirements
 
-### 4.1 POS & Sales Processing Module
-* **Instant Barcode Reader Integration**: Support for standard 1D/2D scanners, multi-barcode item binding, and auto-focus scan mode.
-* **Flexible Unit Conversions**: Automatic price and inventory calculation across primary and secondary packaging (e.g., Box -> Strip -> Piece).
-* **Multi-Payment Settlement**: Support for Cash, Card, Mobile Wallet, Credit (Debt), and Installments on a single checkout flow.
-* **Customer Debt Lookup**: Real-time retrieval of customer credit limit, current running balance, and unpaid invoice counts during checkout.
-* **Automated VAT Calculation**: Item-level and invoice-level Value Added Tax (VAT) computations (Prices inclusive or exclusive of VAT).
-* **Reprint Last Invoice**: One-touch shortcut to print the latest transaction or a specific customer’s last invoice without re-opening history screens.
+### 4.1 Point of Sale (POS) & Checkout Engine
 
-### 4.2 Customer Statement & Credit Ledger
-* **Chronological Ledger View**: Detailed line-item breakdown showing Debit (مدين), Credit (دائن), Running Balance (رصيد متراكم), and Transaction Reason.
-* **Supported Ledger Transactions**: Sales Invoices, Customer Payments, Returns, Exchanges, Manual Credit/Debit Notes, and Manual Adjustments.
-* **Audit-Backed Manual Adjustments**: Mandatory text reason required for any manual ledger balance adjustment (Debit/Credit).
-* **Date Range Filtering & Export**: Period-based statement filtering (From Date -> To Date) with instant export to PDF or Excel.
+#### 4.1.1 Barcode & Item Identification
+* **Multi-Barcode Mapping**: Items can have multiple mapped barcodes (e.g., manufacturer barcode, custom internal SKU, alternative packaging barcode).
+* **Weight-Scale Barcode Parsing**: Natively parses standard retail scale barcodes (`21CCCCCWWWWWC` or `22CCCCCWWWWWC`), extracting product code and embedded weight/price dynamically.
+* **Quick-Access Grid**: Touch-optimized grid with category filtering and visual item badges for fast cashier selection.
 
-### 4.3 Inventory Management & Item Media
-* **Item Properties**: Barcode, extra barcodes, Arabic & English names, category, unit, sub-units (factor conversions), cost price, wholesale price, retail price, profit margin %, stock quantity, min stock alert level, tax settings.
-* **Item Image Support**: Optional local base64/blob image attachment per item for UI grid display and catalog presentation.
-* **Batch & Expiry Date Tracking**: Optional sector-specific expiration date tracking with automated low-stock and near-expiry alerts.
-* **Inventory Export / Audit**: One-click complete or filtered inventory list export to `.xlsx` format.
+#### 4.1.2 Sub-Unit Packaging & Conversion
+* Supports multi-level packaging hierarchies (e.g., `1 Carton = 10 Strips = 100 Pieces`).
+* Dynamic calculation of sale price and stock deductions according to selected unit factor.
 
-### 4.4 Purchases & Supplier Relations
-* **Supplier Accounts**: Running balance tracking for suppliers, credit terms, and transaction logs.
-* **Purchase Invoices**: Stock intake entry with line-item discounts, freight/shipping cost allocation, line-item VAT, and payment status tracking.
+#### 4.1.3 Multi-Payment Settlement
+* Flexible single-invoice payment splits across **Cash**, **Card**, **Mobile Wallet**, **Customer Credit (Debit)**, and **Installments**.
+* Down payment (`downPayment`) handling with automated net calculation.
 
-### 4.5 Treasury, Cash Safes & Banking
-* **Multi-Account Treasury**: Support for Cash Safes (خزينة), Bank Accounts, and Mobile Wallets.
-* **Cash Audit & Reconciliation**: Periodic physical cash counting against book balances, recording surpluses or deficits with auto-generated journal entries.
+#### 4.1.4 Customer Debt & Previous Balance On-Invoice Integration
+* Real-time lookup of customer credit balance and credit limit warning during checkout.
+* **Previous Balance Binding**: Invoices automatically retrieve the customer's prior unpaid balance (`previousBalance`) and link the reference invoice (`previousBalanceInvoiceRef`).
+* **Settlement Formula**:
+  $$\text{Net Amount} = \text{Invoice Total} + \text{Previous Balance} - \text{Down Payment}$$
 
-### 4.6 HR, Attendance & Payroll
-* **Staff Directory & Job Profiles**: Employee profile maintenance, job titles, base salary, and commission percentage setup.
-* **Daily Attendance & Shifts**: Check-in and check-out logs with status categorization (Present, Late, Absent, Leave, Holiday).
-* **Salary Calculation**: Automated monthly payroll computations factoring in base pay, sales commissions, bonuses, deductions, and loan repayments.
-* **Employee Advances (Salaf)**: Loan request logging, approval, partial repayment tracking, and auto-deduction from payroll.
-
-### 4.7 Workshop & Maintenance Module
-* **Device Intake Receipts**: Generation of receipt slips containing serial numbers, customer details, reported faults, and estimated repair costs.
-* **Status Workflow**: Stage progression (`Received` -> `Under Inspection` -> `Ready` -> `Delivered` -> `Cancelled`).
-* **Technician Commissions**: Allocation of repair labor fees and technician commission split per receipt.
+#### 4.1.5 Unified Printing Engine
+* **Single Component Design**: A unified printing pipeline powers POS checkout printing, invoice history reprints, and customer receipt lookups.
+* Supports **A4 Standard Invoices** and **80mm / 58mm Thermal Receipts**.
+* Instant **"Reprint Last Invoice"** shortcut on the main header without navigating away from the active screen.
 
 ---
 
-## 5. Database Schema & Data Models
+### 4.2 Customer Statement & Credit Ledger Module
 
-### 5.1 Core Types & Interfaces (TypeScript)
+#### 4.2.1 Chronological Transaction Ledger
+* Real-time ledger showing: `Date`, `Transaction Type`, `Reference No.`, `Debit (مدين)`, `Credit (دائن)`, `Running Balance (الرصيد المتراكم)`, and `Audit Reason`.
+* Supported transaction types:
+  - Sales Invoices (`invoice`)
+  - Customer Payments (`payment`)
+  - Manual Balance Adjustments (`adjustment`)
+  - Sales Returns (`return`)
+  - Item Exchanges (`exchange`)
+  - Credit Notes (`credit_note`) & Debit Notes (`debit_note`)
 
-#### Item Interface
+#### 4.2.2 Audit-Backed Manual Adjustments
+* Any manual balance change requires an explicit, mandatory text reason entered by the administrator, logged permanently into the immutable audit trail.
+
+#### 4.2.3 Export & Statements
+* Date-range filtering (`from_date` to `to_date`).
+* Instant export of customized customer account statements to **Excel (.xlsx)** or **PDF**.
+
+---
+
+### 4.3 Inventory, Multi-Warehouse & Item Media
+
+#### 4.3.1 Product Master Data
+* **Attributes**: Barcode, extra barcodes array, Arabic & English names, category, base unit, sub-units with conversion factors, purchase cost, wholesale price, retail price, profit margin %, stock quantity, minimum stock alert threshold, tax flags (`taxable`, `taxRateOverride`, `pricesIncludeVat`), manufacturer/brand, and serial numbers.
+* **Item Media**: Optional client-side image attachment (stored locally as base64/blob) displayed across catalog grids and POS lookup modals.
+
+#### 4.3.2 Multi-Warehouse & Logistics
+* **Multi-Warehouse Support**: Management of multiple storage facilities (Main Store, Sub-branch, Van, Warehouse 1).
+* **Inter-Warehouse Stock Transfers**: Tracking transfer requests (`TRF-XXXXXX`), item quantities, serialized items, source, and destination warehouses.
+* **Bundle Assembly & Disassembly**: Creating compound products (kits/bundles) from raw material items with automated stock deduction of components and stock increment of parent items.
+
+#### 4.3.3 Auditing, Expiry & Export
+* **Expiry Date Tracking**: Batch and expiry management with automated near-expiry notifications.
+* **Barcode Physical Audit**: Fast scanning audit mode to reconcile physical quantities against system records.
+* **Inventory Export**: Read-only instant export of full or category-filtered inventory to `.xlsx` format.
+
+---
+
+### 4.4 Purchases & Supplier Management
+
+* **Supplier Directory**: Contact information, credit terms, and running supplier balance ledger.
+* **Purchase Invoices**: Multi-line stock intake with purchase prices, line discounts, shipping/freight cost allocation, line-level VAT, payment statuses (`paid`, `partial`, `unpaid`, `credit`), and payment method selection.
+* **Automatic Inventory Update**: Immediate increment of warehouse stock upon purchase confirmation.
+* **Supplier Payments**: Direct treasury payout logging linked to supplier accounts.
+
+---
+
+### 4.5 Returns & Exchanges Module
+
+* **Sales Returns**: Return processing linked to original invoice ID or as a standalone return. Auto-replenishes item stock, processes cash refund or customer credit adjustment, and generates double-entry refund journals.
+* **Exchanges**: Unified workflow allowing simultaneous return of defective/exchanged items and selection of new purchase items, automatically calculating the net price difference and settlement terms.
+
+---
+
+### 4.6 Treasury, Banking & Cash Safes
+
+* **Multi-Account Infrastructure**: Support for Physical Safes (خزائن), Bank Accounts, and Digital Mobile Wallets.
+* **Transaction Categorization**: Income, Expenses, Inter-Account Transfers, Capital Additions, Owner Drawings, Cheques, Loans, and Tax Payments.
+* **Cash Audit & Physical Reconciliation (`CashAuditModal`)**:
+  - Periodic physical cash counting against book ledger balances.
+  - Automated detection of **Matched**, **Surplus (زيادة)**, or **Deficit (عجز)**.
+  - One-click posting of balancing journal entries to cash shortage/surplus expense accounts.
+
+---
+
+### 4.7 Double-Entry Accounting & Financial Engine
+
+#### 4.7.1 Automated Journal Entry Generation
+Every commercial action triggers balanced double-entry accounting records (`totalDebit === totalCredit`):
+
+$$\sum \text{Debit} = \sum \text{Credit}$$
+
+| Triggering Event | Debit Account (DR) | Credit Account (CR) |
+| :--- | :--- | :--- |
+| **Cash Sale** | Cash Safe / Bank Account | Sales Revenue Account |
+| **Credit Sale** | Accounts Receivable (Customer) | Sales Revenue Account |
+| **Customer Payment Received** | Cash Safe / Bank Account | Accounts Receivable (Customer) |
+| **Purchase on Credit** | Inventory Asset Account | Accounts Payable (Supplier) |
+| **Purchase Paid via Bank** | Inventory Asset Account | Bank Account |
+| **Salary Payment** | Payroll Expense Account | Cash Safe / Bank Account |
+| **Cash Audit Deficit** | Cash Shortage & Deficit Expense | Cash Safe Account |
+| **Fixed Asset Depreciation** | Depreciation Expense | Accumulated Depreciation Asset |
+
+#### 4.7.2 Financial Statements & Reports
+* **General Ledger & Journal Entries Viewer**: Full chronological journal history with line memos.
+* **Trial Balance (ميزان المراجعة)**: Verification of account debit/credit equilibrium.
+* **Income Statement / P&L (قائمة الدخل)**: Calculation of Gross Profit, Operating Expenses, Net Operating Profit.
+* **Balance Sheet (الميزانية العمومية)**: Assets = Liabilities + Owner's Equity.
+
+---
+
+### 4.8 HR, Attendance & Payroll Management
+
+* **Employee Profiles**: Personal data, job titles, departments, base salary, sales commission rate %, hire date, linked system user account.
+* **Attendance Tracking**: Daily check-in / check-out with status classification (`Present`, `Absent`, `Late`, `Leave`, `Holiday`).
+* **Payroll Calculation Engine**:
+  $$\text{Net Salary} = \text{Base Salary} + \text{Sales Commissions} + \text{Bonuses} - \text{Deductions} - \text{Social Insurance} - \text{Loan Advances}$$
+* **Employee Advances (Salaf)**: Loan request logging, approval workflow, partial repayment tracking, and automated deduction during monthly payroll processing.
+
+---
+
+### 4.9 Workshop & Maintenance Service Module
+
+* **Device Intake Receipts**: Generation of official maintenance receipt tickets recording customer information, device brand/model, serial number, reported fault, technician assigned, estimated cost, and advance deposit paid.
+* **Workflow Lifecycle Progression**:
+  $$\text{Received} \longrightarrow \text{Under Inspection} \longrightarrow \text{Ready for Pickup} \longrightarrow \text{Delivered} \ (\text{or } \text{Cancelled})$$
+* **Technician Commissions**: Automatic computation and allocation of repair labor fees to technician earnings.
+* **Printable Service Slips**: Thermal or A4 repair claim tickets for customers with terms & conditions footer.
+
+---
+
+### 4.10 AI Copilot & Natural Language Assistant
+
+* **Dual-Engine Architecture**:
+  1. **Cloud AI (Google Gemini API)**: Generates deep business insights, executive summaries, inventory trend forecasts, and conversational responses.
+  2. **Local Rule-Based NLP Engine (`localParser.ts`)**: 100% offline natural language parser capable of executing actions (e.g., adding customers, looking up sales figures, checking stock levels) without requiring an internet connection or API key.
+* **In-App AI Chat Drawer**: Accessible from any screen with context-aware shortcuts.
+
+---
+
+### 4.11 Central Tax & E-Invoicing Engine
+
+* **VAT Calculation Rules**:
+  - Supports both **Tax Inclusive** and **Tax Exclusive** item pricing.
+  - Per-item tax overrides and tax-exempt items.
+  - Automatic deduction of reverse-charge / withholding tax (1% Egyptian WHT on commercial supplies).
+* **Egyptian Tax Authority (ETA) E-Invoicing Simulation**:
+  - Compliant canonical JSON document hashing (SHA-256) and simulated digital signatures.
+  - Document status tracking (`Submitted`, `Valid`, `Rejected`).
+* **ZATCA / ETA TLV QR Code Generator**:
+  - Generates standard Tag-Length-Value (TLV) Base64 encoded QR codes on all sales invoices containing Seller Name, VAT Registration Number, Timestamp, Total Amount, and VAT Total.
+
+---
+
+## 5. Official Sales Invoice Layout Specification (`شكل_الفواتير.xlsx`)
+
+The official sales invoice layout strictly complies with the design specification defined in `شكل_الفواتير.xlsx` and is powered by the visual `InvoiceSpreadsheetDesigner`.
+
+```
++---------------------------------------------------------------------------------------+
+|  [ LOGO ]       COMPANY NAME / اسم الشركة                       INVOICE # / رقم الفاتورة:  |
+|                 Phone: {{Company_Phone}}                       INV-2026-0001           |
+|                 Tax ID: {{Tax_Registration_No}}                 Date: {{Date_Time}}     |
++---------------------------------------------------------------------------------------+
+|  Client Name / اسم العميل: {{Client_Name}}          Seller / البائع: {{Seller_Name}}    |
+|  Management / الإدارة:     {{Admin_Name}}           Partners: {{Owner_1}} / {{Owner_2}} |
++---------------------------------------------------------------------------------------+
+| Code / الكود | Product / الصنف       | Qty / الكمية | Unit Price / السعر | Total / الإجمالي |
++--------------+----------------------+--------------+--------------------+------------------+
+| {{Code}}     | {{Item_Name}}        | {{Qty}}      | {{Price}}          | {{Line_Total}}   |
++--------------+----------------------+--------------+--------------------+------------------+
+|                                                    Subtotal / الإجمالي: | {{Subtotal}}     |
+|                                                    Tax (VAT) / الضريبة: | {{Tax_Amount}}   |
+|                                                    Previous / سابق:     | {{Prev_Balance}} |
+|                                                    Deposit / مدفوع:     | {{Down_Payment}} |
+|                                                    NET DUE / الصافي:    | {{Net_Amount}}   |
++---------------------------------------------------------------------------------------+
+| Terms & Thank You: {{Thank_You_Message}}                                               |
++---------------------------------------------------------------------------------------+
+```
+
+### 5.1 Dynamic Data Binding Placeholders
+
+| Variable Placeholder | Data Source Mapping | Description |
+| :--- | :--- | :--- |
+| `{{Company_Name}}` | `state.company.nameAr` / `name` | Registered business trade name |
+| `{{Company_Phone}}` | `state.company.phone` | Primary company contact number |
+| `{{Invoice_Number}}` | `saleInvoice.invoiceNumber` | Unique sequential invoice identifier |
+| `{{Date_Time}}` | `saleInvoice.createdAt` | Formatted timestamp of sale issuance |
+| `{{Client_Name}}` | `saleInvoice.customerName` | Customer name or "Cash Customer" |
+| `{{Seller_Name}}` | `saleInvoice.createdBy` | Cashier/salesperson who issued the bill |
+| `{{Owner_Name_1/2}}` | `state.company.ownerName1/2` | Custom owner/partner names from settings |
+| `{{Item_Code}}` | `item.barcode` | Primary barcode or SKU |
+| `{{Item_Name}}` | `item.nameAr` / `item.name` | Product designation in active language |
+| `{{Item_Qty}}` | `saleItem.quantity` | Quantity sold in selected unit |
+| `{{Item_Price}}` | `saleItem.unitPrice` | Billed unit price |
+| `{{Item_Total}}` | `saleItem.total` | Net line total after line discount |
+| `{{Total_Amount}}` | `saleInvoice.total` | Total amount of current invoice items |
+| `{{Previous_Balance}}` | `saleInvoice.previousBalance`| Customer outstanding debt prior to sale |
+| `{{Down_Payment}}` | `saleInvoice.paid` / `downPayment`| Upfront payment collected at checkout |
+| `{{Net_Amount}}` | `saleInvoice.netAmount` | Grand settlement total including prior debt |
+
+---
+
+## 6. Comprehensive Data Models & Database Schemas
+
+### 6.1 Core TypeScript Interfaces
+
 ```typescript
 export interface Item {
   id: string;
@@ -149,15 +391,15 @@ export interface Item {
   description: string;
   isActive: boolean;
   createdAt: string;
-  image?: string; // base64 / blob image payload
+  image?: string; // base64 / blob
   taxable?: boolean;
   taxRateOverride?: number;
   pricesIncludeVat?: boolean;
+  size?: string;
+  color?: string;
+  manufacturer?: string;
 }
-```
 
-#### Sale Invoice Interface
-```typescript
 export interface SaleInvoice {
   id: string;
   invoiceNumber: string;
@@ -172,10 +414,11 @@ export interface SaleInvoice {
   previousBalance?: number;
   previousBalanceInvoiceRef?: string;
   downPayment?: number;
-  netAmount?: number; // Net = Total + Previous Balance - Down Payment
+  netAmount?: number;
   paymentMethod: PaymentMethod;
   paymentStatus: PaymentStatus;
   notes: string;
+  extraCharges: ExtraCharge[];
   createdAt: string;
   createdBy: string;
   pricesIncludeVat?: boolean;
@@ -184,23 +427,11 @@ export interface SaleInvoice {
   taxAmount?: number;
   totalInclTax?: number;
 }
-```
-
-#### Customer Transaction Ledger Interface
-```typescript
-export type CustomerTransactionType = 
-  | 'invoice' 
-  | 'payment' 
-  | 'adjustment' 
-  | 'return' 
-  | 'exchange' 
-  | 'credit_note' 
-  | 'debit_note';
 
 export interface CustomerTransaction {
   id: string;
   customerId: string;
-  type: CustomerTransactionType;
+  type: 'invoice' | 'payment' | 'adjustment' | 'return' | 'exchange' | 'credit_note' | 'debit_note';
   amount: number;
   direction: 'debit' | 'credit';
   reason?: string;
@@ -209,88 +440,136 @@ export interface CustomerTransaction {
   createdAt: string;
   createdBy: string;
 }
+
+export interface MaintenanceReceipt {
+  id: string;
+  receiptNumber: string;
+  customerName: string;
+  customerPhone: string;
+  deviceName: string;
+  deviceModel?: string;
+  serialNumber?: string;
+  reportedFault: string;
+  expectedCost: number;
+  depositPaid: number;
+  technicianName: string;
+  technicianCommission: number;
+  status: 'received' | 'under_inspection' | 'ready' | 'delivered' | 'cancelled';
+  receivedDate: string;
+  expectedDeliveryDate: string;
+  deliveredDate?: string;
+  notes?: string;
+  createdAt: string;
+  createdBy: string;
+}
+```
+
+### 6.2 Supabase PostgreSQL Cloud Schema (Extract)
+
+```sql
+-- Team Tenancy & Cloud Synchronization Table
+CREATE TABLE IF NOT EXISTS public.teams (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL,
+    owner_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.team_members (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    team_id UUID REFERENCES public.teams(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    role TEXT NOT NULL DEFAULT 'employee',
+    permissions JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    UNIQUE(team_id, user_id)
+);
+
+CREATE TABLE IF NOT EXISTS public.team_data (
+    team_id UUID PRIMARY KEY REFERENCES public.teams(id) ON DELETE CASCADE,
+    state_json JSONB NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Row Level Security (RLS) Policies
+ALTER TABLE public.team_data ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Team members can access their team data"
+ON public.team_data
+FOR ALL
+USING (
+    team_id IN (
+        SELECT team_id FROM public.team_members WHERE user_id = auth.uid()
+    )
+);
 ```
 
 ---
 
-## 6. Financial Architecture & Double-Entry Accounting Rules
+## 7. Non-Functional Requirements (NFRs)
 
-### 6.1 Double-Entry Principles
-Every transaction within Easy Store ERP automatically generates balanced double-entry journal entries (`totalDebit === totalCredit`):
+### 7.1 Performance & Responsiveness
+* **Barcode Scan Latency**: POS scan-to-cart latency must be under **50 milliseconds**.
+* **Startup Time**: Cold startup of the desktop Tauri application must complete in under **1.2 seconds**.
+* **Memory Footprint**: Client memory usage should remain below **180 MB** during standard operations.
+* **Large Dataset Handling**: Product search and customer autocomplete must maintain 60 FPS scrolling for catalogs with up to **50,000 items**.
 
-1. **Cash Sale**:
-   * Debit (`DR`): Cash Safe / Treasury Account (`amount`)
-   * Credit (`CR`): Sales Revenue Account (`amount`)
-2. **Credit Sale (Account Receivable)**:
-   * Debit (`DR`): Accounts Receivable - Customer (`amount`)
-   * Credit (`CR`): Sales Revenue Account (`amount`)
-3. **Customer Payment Recieved**:
-   * Debit (`DR`): Cash Safe / Bank (`amount`)
-   * Credit (`CR`): Accounts Receivable - Customer (`amount`)
-4. **Purchase Intake (Credit)**:
-   * Debit (`DR`): Inventory Asset Account (`amount`)
-   * Credit (`CR`): Accounts Payable - Supplier (`amount`)
-5. **Cash Audit Deficit**:
-   * Debit (`DR`): Cash Shortage & Deficit Expense (`amount`)
-   * Credit (`CR`): Cash Safe / Treasury Account (`amount`)
+### 7.2 Reliability & Offline Resilience
+* **Zero Cloud Dependency**: Every operational transaction (Sales, Returns, Inventory, HR, Reports) executes locally without network connectivity.
+* **Atomic File Writes**: Disk persistence uses atomic temp-file write and rename strategies to prevent file corruption on unexpected power outages.
+* **Automatic Conflict Resolution**: Background sync resolves differences using timestamped vector comparison (`updated_at`).
 
----
+### 7.3 Internationalization & Usability
+* **100% Bilingual Coverage**: Arabic (`ar`) and English (`en`) with zero missing translation strings, verified in CI/CD via `scripts/check-i18n.mjs`.
+* **Directionality & RTL**: Flawless layout mirroring for Right-to-Left (Arabic) and Left-to-Right (English) typography.
+* **Keyboard Accessibility**: Full keyboard POS shortcuts (`F1` Help, `F2` New Invoice, `F9` Pay Cash, `F10` Print, `ESC` Close Modal).
 
-## 7. Official Sales Invoice Layout Specification (`شكل_الفواتير.xlsx`)
-
-The official sales invoice design follows the mandatory template structure defined in `شكل_الفواتير.xlsx`:
-
-### 7.1 Header Elements
-* **Company Branding**: Logo (`Logo`), Company Name, and `{{Company_Phone}}`.
-* **Invoice Metadata**: `{{Invoice_Number}}` (displayed prominently), `{{Date_Time}}`.
-* **Stakeholders & Staff**: `{{Owner_Name_1}}`, `{{Owner_Name_2}}`, `{{Seller_Name}}`, `{{Admin_Name}}`, and `{{Client_Name}}`.
-
-### 7.2 Dynamic Line-Item Grid
-Columns are rendered dynamically:
-* `{{Item_Code}}` — Unique item barcode or SKU.
-* `{{Item_Name}}` — Product designation (Bilingual support).
-* `{{Item_Qty}}` — Billed quantity.
-* `{{Item_Price}}` — Unit sale price.
-* `{{Item_Total}}` — Line item total (`Qty * Price - Discount`).
-
-### 7.3 Totals Footer Summary
-* `{{Total_Amount}}`: Gross current invoice subtotal.
-* `{{Previous_Balance}}`: Outstanding debt prior to invoice creation (`previousBalanceInvoiceRef`).
-* `{{Down_Payment}}`: Deposit paid at invoice issue time (`downPayment`).
-* `{{Net_Amount}}`: Final settlement total (`Total_Amount + Previous_Balance - Down_Payment`).
+### 7.4 Security & Data Privacy
+* **Hardware Licensing**: Cryptographic hardware license activation bound to device CPU/disk identifiers with HMAC-SHA256 signature verification.
+* **Data Sanitization**: All imports (JSON/Excel) and database writes pass through strict **Zod** schema validators.
+* **Data Export Isolation**: All report generation and Excel/PDF exports operate in strict **Read-Only Mode** on the database state.
 
 ---
 
-## 8. Multi-Sector Profiling Framework
+## 8. Quality Assurance & Verification Matrix
 
-Easy Store ERP supports customized sector profiles (`SectorProfile`), adjusting the active UI components and fields automatically:
+### 8.1 Automated Test Suites
 
-| Sector Profile | Color/Size | Expiry Date | Serial Tracking | Weight Scale Barcodes | Maintenance Module |
-| :--- | :---: | :---: | :---: | :---: | :---: |
-| **General Retail** | Optional | No | Optional | Optional | No |
-| **Supermarket / Grocery**| No | Yes | No | Yes | No |
-| **Clothing & Apparel** | Yes | No | No | No | No |
-| **Electronics & Hardware**| No | No | Yes | No | Optional |
-| **Maintenance Shop** | No | No | Yes | No | Yes |
+| Test Suite File | Scope & Tested Functionality |
+| :--- | :--- |
+| `src/services/tax.test.ts` | VAT engine, inclusive/exclusive calculations, reverse charge 1% |
+| `src/services/license.test.ts` | Machine ID generation, offline license validation, tampering detection |
+| `src/services/excel.test.ts` | Excel workbook generation, column formatting, customer statement export |
+| `src/services/ai/localParser.test.ts` | Offline rule-based NLP intent classification and entity extraction |
+| `src/services/ai/actions.test.ts` | Execution of parsed natural language business commands |
+| `src/context/recalcCustomerBalances.test.ts` | Accurate customer running balance re-computation across transaction logs |
+| `src/components/invoice/invoiceSpreadsheetTemplate.test.ts` | Spreadsheet template grid initialization and variable placeholders |
+| `src/db/migrate.test.ts` | Database schema migrations and backwards-compatibility verification |
+
+### 8.2 Build & Lint Validation Commands
+
+```bash
+# Verify 100% translation coverage
+npm run check:i18n
+
+# Type-check all TypeScript files in strict mode
+npm run typecheck
+
+# Execute Vitest automated unit and integration tests
+npm run test
+
+# Run ESLint validation
+npm run lint
+
+# Production build bundle
+npm run build
+```
 
 ---
 
-## 9. Integration, Branding, & Export Infrastructure
+## 9. Appendix: Non-Negotiable System Principles
 
-### 9.1 Theming & Visual Customization
-* **CSS Variable Design Tokens**: Primary dynamic accent colors injected live via `var(--primary)` and theme settings.
-* **Logo Management**: Company logo uploaded via settings, stored as base64 string, rendered across app headers and printed documents.
-* **Bilingual UI Customization**: Configurable invoice label overrides (English and Arabic titles, totals labels, and footer thank-you messages).
-
-### 9.2 Data Export & Safety Rules
-1. **Read-Only Database Audits**: All data export operations (Excel/PDF reports, inventory exports) perform strictly read-only queries with zero mutations.
-2. **Offline-First Resilience**: All core system functions operate 100% offline. Network connection failure triggers automatic queueing of cloud sync operations without interrupting POS checkout.
-
----
-
-## 10. Non-Negotiable System Principles
-
-1. **Mandatory Audit Trail**: Any manual alteration of customer balance or inventory levels must require a recorded user-entered text reason.
-2. **Single Printing Component**: All invoice printing operations (New sale, reprint last invoice, history lookup) utilize a unified print component to eliminate code duplication.
-3. **Data Integrity Guarantee**: Financial calculations must prevent floating-point rounding discrepancies by enforcing standardized precision functions across totals and taxes.
-4. **Local Data Privacy**: Item images and local credentials remain within the client database environment unless cloud sync is explicitly enabled by the owner.
+1. **Mandatory Audit Trail**: No customer balance or stock quantity can be adjusted manually without capturing a mandatory user-entered explanation stored in the audit log.
+2. **Single Reusable Printing Engine**: All invoice output channels (new POS checkout, history reprint, customer view) must consume the unified invoice document component.
+3. **Floating-Point Precision Guarantee**: All monetary calculations must use centralized 2-decimal rounding functions (`round2`) with `Number.EPSILON` correction to eliminate floating-point arithmetic errors.
+4. **Local Data Privacy**: Item media, local accounts, and transaction records remain strictly stored on the local client disk unless cloud synchronization is explicitly activated by the Owner.

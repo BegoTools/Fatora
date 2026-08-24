@@ -6,7 +6,7 @@ const resources = {
   en: {
     translation: {
       app: {
-        name: 'Easy Store',
+        name: 'Fatora',
         tagline: 'Retail ERP System',
         version: 'v2.0 Demo',
       },
@@ -750,7 +750,7 @@ const resources = {
   ar: {
     translation: {
       app: {
-        name: 'Easy Store',
+        name: 'Fatora',
         tagline: 'نظام إدارة المخازن والحسابات',
         version: 'الإصدار 2.0 تجريبي',
       },

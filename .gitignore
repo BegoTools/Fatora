@@ -30,3 +30,5 @@ dist-ssr
 
 # Antigravity agents
 .agents/
+testsprite_tests/tmp/
+testsprite_tests/tmp/config.json

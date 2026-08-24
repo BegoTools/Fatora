@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Store, Mail, Lock, User as UserIcon, Loader2, Eye, EyeOff, Globe } from 'lucide-react';
+import { Mail, Lock, User as UserIcon, Loader2, Eye, EyeOff, Globe } from 'lucide-react';
+import logoUrl from '@/assets/logo.png';
 import { useAuth } from '@/context/AuthContext';
 import type { AuthResult } from '@/services/auth';
 
@@ -64,8 +65,8 @@ export function Login() {
 
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-primary to-[#00355f] flex items-center justify-center mb-4 shadow-lg">
-            <Store size={32} className="text-white" />
+          <div className="h-16 mx-auto rounded-2xl bg-gradient-to-br from-primary to-[#00355f] flex items-center justify-center mb-4 shadow-lg px-5">
+            <img src={logoUrl} alt="Fatora" className="h-11 w-auto object-contain" />
           </div>
           <h1 className="text-2xl font-bold text-foreground">{t('app.name')}</h1>
           <p className="text-sm text-muted-foreground mt-1">

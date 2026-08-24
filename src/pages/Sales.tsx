@@ -365,7 +365,7 @@ export function Sales() {
   const filteredInvoices = useMemo(() => {
     if (!searchQuery) return salesInvoices;
     const q = searchQuery.toLowerCase();
-    return salesInvoices.filter(i => 
+    return salesInvoices.filter(i =>
       i.invoiceNumber.toLowerCase().includes(q) ||
       i.customerName?.toLowerCase().includes(q)
     );
@@ -411,9 +411,8 @@ export function Sales() {
             <button
               key={v}
               onClick={() => setView(v)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                view === v ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent'
-              }`}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${view === v ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent'
+                }`}
             >
               {t(`sales.${v}`)}
             </button>
@@ -672,11 +671,10 @@ export function Sales() {
                   <button
                     key={pm}
                     onClick={() => { setPaymentMethod(pm); setAmountPaid(''); }}
-                    className={`flex flex-col items-center gap-1 p-2 rounded-lg border text-xs font-medium transition-colors ${
-                      paymentMethod === pm
+                    className={`flex flex-col items-center gap-1 p-2 rounded-lg border text-xs font-medium transition-colors ${paymentMethod === pm
                         ? 'border-primary bg-primary/10 text-primary'
                         : 'border-border text-muted-foreground hover:bg-muted/50'
-                    }`}
+                      }`}
                   >
                     {pm === 'cash' && <Banknote size={18} />}
                     {pm === 'card' && <CreditCard size={18} />}
@@ -763,11 +761,10 @@ export function Sales() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-col gap-1">
-                        <span className={`text-xs px-2 py-0.5 rounded-full inline-block w-fit ${
-                          inv.paymentStatus === 'paid'
+                        <span className={`text-xs px-2 py-0.5 rounded-full inline-block w-fit ${inv.paymentStatus === 'paid'
                             ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400'
                             : 'bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400'
-                        }`}>
+                          }`}>
                           {t(`common.${inv.paymentStatus}`)}
                         </span>
                         {inv.remaining > 0 && (
@@ -908,15 +905,14 @@ export function Sales() {
                   <div className="mt-3 pt-3 border-t border-border space-y-2">
                     <div className="flex justify-between text-xs">
                       <span className="text-muted-foreground">{t('common.balance')}</span>
-                      <span className={`font-mono font-medium ${
-                        totalRemaining > 0
+                      <span className={`font-mono font-medium ${totalRemaining > 0
                           ? isOverLimit
                             ? 'text-destructive'
                             : isApproachingLimit
                               ? 'text-amber-600 dark:text-amber-400'
                               : 'text-primary'
                           : 'text-muted-foreground'
-                      }`}>
+                        }`}>
                         {formatCurrency(totalRemaining)}
                       </span>
                     </div>
@@ -927,9 +923,8 @@ export function Sales() {
                     {creditLimit > 0 && (
                       <div className="w-full h-1.5 bg-muted/30 rounded-full overflow-hidden">
                         <div
-                          className={`h-full rounded-full transition-all ${
-                            isOverLimit ? 'bg-destructive' : isApproachingLimit ? 'bg-amber-600 dark:bg-amber-400' : 'bg-primary'
-                          }`}
+                          className={`h-full rounded-full transition-all ${isOverLimit ? 'bg-destructive' : isApproachingLimit ? 'bg-amber-600 dark:bg-amber-400' : 'bg-primary'
+                            }`}
                           style={{ width: `${Math.min(usagePercent, 100)}%` }}
                         />
                       </div>
